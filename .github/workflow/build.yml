@@ -1,0 +1,161 @@
+name: Build and Release Python Binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      python_version:
+        description: 'Python version to build (e.g., 3.9.18, 3.10.13, 3.11.7)'
+        required: true
+        default: '3.11.12'
+
+jobs:
+  build-python:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set release tag
+      run: |
+        echo "RELEASE_TAG=python-${{ github.event.inputs.python_version }}-linux" >> $GITHUB_ENV
+      
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y make build-essential libssl-dev zlib1g-dev \
+        libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
+        libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev \
+        libgdbm-dev libgdbm-compat-dev uuid-dev
+
+    - name: Download Python source
+      run: |
+        wget https://www.python.org/ftp/python/${{ github.event.inputs.python_version }}/Python-${{ github.event.inputs.python_version }}.tgz
+        tar xzf Python-${{ github.event.inputs.python_version }}.tgz
+        
+    - name: Prepare build directory
+      run: |
+        mkdir -p python_install
+        INSTALL_PATH=$(pwd)/python_install
+
+    - name: Configure and build Python
+      run: |
+        cd Python-${{ github.event.inputs.python_version }}
+        
+        # Set optimization flags (using level 2 by default)
+        OPT_FLAGS="--enable-optimizations --with-lto"
+        
+        # Configure Python build
+        INSTALL_PATH=$(pwd)/../python_install
+        ./configure --prefix=$INSTALL_PATH $OPT_FLAGS
+        
+        # Build and install
+        make -j$(nproc)
+        make install
+
+    - name: Create binary archives
+      run: |
+        PACKAGE_NAME="python-${{ github.event.inputs.python_version }}-linux-$(uname -m)"
+        
+        # Create tarball
+        tar -czvf $PACKAGE_NAME.tar.gz -C python_install .
+        
+        # Create zip file
+        cd python_install
+        zip -r ../$PACKAGE_NAME.zip .
+        cd ..
+        
+        echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+        
+    - name: Create installation script
+      run: |
+        cat > install.sh << 'EOF'
+        #!/bin/bash
+        # Python binary installation script
+        
+        # Default installation directory
+        DEFAULT_INSTALL_DIR="/opt/python-${{ github.event.inputs.python_version }}"
+        INSTALL_DIR=${1:-$DEFAULT_INSTALL_DIR}
+        
+        # Check if run as root
+        if [ "$(id -u)" -ne 0 ]; then
+            echo "This script must be run as root to install to system directories."
+            echo "Usage: sudo ./install.sh [INSTALL_DIR]"
+            exit 1
+        fi
+        
+        echo "Installing Python ${{ github.event.inputs.python_version }} to $INSTALL_DIR..."
+        
+        # Create installation directory
+        mkdir -p "$INSTALL_DIR"
+        
+        # Extract files
+        if [ -f "$(dirname "$0")/${{ env.PACKAGE_NAME }}.tar.gz" ]; then
+            tar -xzf "$(dirname "$0")/${{ env.PACKAGE_NAME }}.tar.gz" -C "$INSTALL_DIR"
+        elif [ -f "$(dirname "$0")/${{ env.PACKAGE_NAME }}.zip" ]; then
+            unzip "$(dirname "$0")/${{ env.PACKAGE_NAME }}.zip" -d "$INSTALL_DIR"
+        else
+            echo "Error: Neither tar.gz nor zip archive found!"
+            exit 1
+        fi
+        
+        # Create symlinks in /usr/local/bin
+        echo "Creating symlinks in /usr/local/bin..."
+        ln -sf "$INSTALL_DIR/bin/python3" /usr/local/bin/python${{ github.event.inputs.python_version }}
+        ln -sf "$INSTALL_DIR/bin/pip3" /usr/local/bin/pip${{ github.event.inputs.python_version }}
+        
+        echo "Python ${{ github.event.inputs.python_version }} has been installed successfully!"
+        echo "You can use it with: python${{ github.event.inputs.python_version }}"
+        EOF
+        
+        chmod +x install.sh
+        
+    - name: Create checksum file
+      run: |
+        sha256sum ${{ env.PACKAGE_NAME }}.tar.gz ${{ env.PACKAGE_NAME }}.zip install.sh > SHA256SUMS.txt
+        
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.RELEASE_TAG }}
+        name: Python ${{ github.event.inputs.python_version }} Linux Binary
+        body: |
+          Custom Python ${{ github.event.inputs.python_version }} binary build for Linux
+          
+          **Build Configuration:**
+          - Python Version: ${{ github.event.inputs.python_version }}
+          - Optimization Level: 2 (full optimizations with LTO)
+          - With Pip/Setuptools/Wheel: Yes
+          - Architecture: $(uname -m)
+          - Build Date: 2025-04-16 14:06:18
+          - Built by: anubhavkrishna1
+          
+          **Installation Instructions:**
+          ```bash
+          # Download the release files (choose either tar.gz or zip)
+          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ env.PACKAGE_NAME }}.tar.gz
+          # OR
+          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ env.PACKAGE_NAME }}.zip
+          
+          # Download the installation script
+          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/install.sh
+          
+          # Verify checksums
+          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+          
+          # Install (system-wide)
+          sudo bash install.sh
+          
+          # Or install to custom location
+          sudo bash install.sh /path/to/custom/location
+          ```
+        draft: false
+        prerelease: false
+        files: |
+          ${{ env.PACKAGE_NAME }}.tar.gz
+          ${{ env.PACKAGE_NAME }}.zip
+          install.sh
+          SHA256SUMS.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
