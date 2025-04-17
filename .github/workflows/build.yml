@@ -6,7 +6,7 @@ on:
       python_version:
         description: 'Python version to build (e.g., 3.9.18, 3.10.13, 3.11.7)'
         required: true
-        default: '3.11.12'
+        default: '3.11.7'
 
 jobs:
   build-python:
@@ -15,17 +15,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       
-    - name: Set release tag
+    - name: Set release tag and build date
       run: |
+        echo "RELEASE_TAG=python-${{ github.event.inputs.python_version }}-linux" >> $GITHUB_ENV
         echo "RELEASE_TAG=python-${{ github.event.inputs.python_version }}-linux" >> $GITHUB_ENV
       
     - name: Install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y make build-essential libssl-dev zlib1g-dev \
-        libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
-        libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev \
-        libgdbm-dev libgdbm-compat-dev uuid-dev
+        sudo apt-get install -y build-essential gdb lcov pkg-config \
+        libbz2-dev libffi-dev libgdbm-dev libgdbm-compat-dev liblzma-dev \
+        libncurses5-dev libreadline6-dev libsqlite3-dev libssl-dev \
+        lzma lzma-dev tk-dev uuid-dev zlib1g-dev libmpdec-dev \
+        wget curl llvm make
 
     - name: Download Python source
       run: |
@@ -52,6 +54,19 @@ jobs:
         make -j$(nproc)
         make install
 
+        # Fix any remaining shebang issues
+        PY_VERSION=$(echo ${{ github.event.inputs.python_version }} | cut -d. -f1,2)
+        find "$INSTALL_DIR/bin" -type f -not -name "python*" -exec sed -i '1s|^#!.*/bin/python[0-9.]*|#!/usr/bin/env python'$PY_VERSION'|' {} \;
+
+    - name: Remove unnecessary files
+      run: |
+        # Remove tests
+        find python_install -type d -name "test" -o -name "tests" | xargs rm -rf
+        find python_install -type d -name "__pycache__" | xargs rm -rf
+
+        # Remove idle and other GUI tools if not needed
+        rm -f python_install/bin/idle*
+
     - name: Create binary archives
       run: |
         PACKAGE_NAME="python-${{ github.event.inputs.python_version }}-linux-$(uname -m)"
@@ -66,52 +81,9 @@ jobs:
         
         echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
         
-    - name: Create installation script
-      run: |
-        cat > install.sh << 'EOF'
-        #!/bin/bash
-        # Python binary installation script
-        
-        # Default installation directory
-        DEFAULT_INSTALL_DIR="/opt/python-${{ github.event.inputs.python_version }}"
-        INSTALL_DIR=${1:-$DEFAULT_INSTALL_DIR}
-        
-        # Check if run as root
-        if [ "$(id -u)" -ne 0 ]; then
-            echo "This script must be run as root to install to system directories."
-            echo "Usage: sudo ./install.sh [INSTALL_DIR]"
-            exit 1
-        fi
-        
-        echo "Installing Python ${{ github.event.inputs.python_version }} to $INSTALL_DIR..."
-        
-        # Create installation directory
-        mkdir -p "$INSTALL_DIR"
-        
-        # Extract files
-        if [ -f "$(dirname "$0")/${{ env.PACKAGE_NAME }}.tar.gz" ]; then
-            tar -xzf "$(dirname "$0")/${{ env.PACKAGE_NAME }}.tar.gz" -C "$INSTALL_DIR"
-        elif [ -f "$(dirname "$0")/${{ env.PACKAGE_NAME }}.zip" ]; then
-            unzip "$(dirname "$0")/${{ env.PACKAGE_NAME }}.zip" -d "$INSTALL_DIR"
-        else
-            echo "Error: Neither tar.gz nor zip archive found!"
-            exit 1
-        fi
-        
-        # Create symlinks in /usr/local/bin
-        echo "Creating symlinks in /usr/local/bin..."
-        ln -sf "$INSTALL_DIR/bin/python3" /usr/local/bin/python${{ github.event.inputs.python_version }}
-        ln -sf "$INSTALL_DIR/bin/pip3" /usr/local/bin/pip${{ github.event.inputs.python_version }}
-        
-        echo "Python ${{ github.event.inputs.python_version }} has been installed successfully!"
-        echo "You can use it with: python${{ github.event.inputs.python_version }}"
-        EOF
-        
-        chmod +x install.sh
-        
     - name: Create checksum file
       run: |
-        sha256sum ${{ env.PACKAGE_NAME }}.tar.gz ${{ env.PACKAGE_NAME }}.zip install.sh > SHA256SUMS.txt
+        sha256sum ${{ env.PACKAGE_NAME }}.tar.gz ${{ env.PACKAGE_NAME }}.zip > SHA256SUMS.txt
         
     - name: Create Release
       id: create_release
@@ -127,35 +99,14 @@ jobs:
           - Optimization Level: 2 (full optimizations with LTO)
           - With Pip/Setuptools/Wheel: Yes
           - Architecture: $(uname -m)
-          - Build Date: 2025-04-16 14:06:18
+          - Build Date: ${{ env.BUILD_DATE }}
           - Built by: anubhavkrishna1
           
-          **Installation Instructions:**
-          ```bash
-          # Download the release files (choose either tar.gz or zip)
-          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ env.PACKAGE_NAME }}.tar.gz
-          # OR
-          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ env.PACKAGE_NAME }}.zip
-          
-          # Download the installation script
-          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/install.sh
-          
-          # Verify checksums
-          wget https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/SHA256SUMS.txt
-          sha256sum -c SHA256SUMS.txt
-          
-          # Install (system-wide)
-          sudo bash install.sh
-          
-          # Or install to custom location
-          sudo bash install.sh /path/to/custom/location
-          ```
         draft: false
         prerelease: false
         files: |
           ${{ env.PACKAGE_NAME }}.tar.gz
           ${{ env.PACKAGE_NAME }}.zip
-          install.sh
           SHA256SUMS.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
