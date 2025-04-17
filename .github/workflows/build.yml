@@ -56,7 +56,7 @@ jobs:
 
         # Fix any remaining shebang issues
         PY_VERSION=$(echo ${{ github.event.inputs.python_version }} | cut -d. -f1,2)
-        find "$INSTALL_DIR/bin" -type f -not -name "python*" -exec sed -i '1s|^#!.*/bin/python[0-9.]*|#!/usr/bin/env python'$PY_VERSION'|' {} \;
+        find "$INSTALL_PATH/bin" -type f -not -name "python*" -exec sed -i '1s|^#!.*/bin/python[0-9.]*|#!/usr/bin/env python'$PY_VERSION'|' {} \;
 
     - name: Remove unnecessary files
       run: |
