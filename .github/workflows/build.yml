@@ -15,10 +15,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       
-    - name: Set release tag and build date
+    - name: Set architecture and build date
       run: |
         echo "RELEASE_TAG=python-${{ github.event.inputs.python_version }}-linux" >> $GITHUB_ENV
-        echo "RELEASE_TAG=python-${{ github.event.inputs.python_version }}-linux" >> $GITHUB_ENV
+        echo "BUILD_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+        echo "ARCHITECTURE=$(uname -m)" >> $GITHUB_ENV
       
     - name: Install build dependencies
       run: |
@@ -98,7 +99,7 @@ jobs:
           - Python Version: ${{ github.event.inputs.python_version }}
           - Optimization Level: 2 (full optimizations with LTO)
           - With Pip/Setuptools/Wheel: Yes
-          - Architecture: $(uname -m)
+          - Architecture: ${{ env.ARCHITECTURE }}
           - Build Date: ${{ env.BUILD_DATE }}
           - Built by: anubhavkrishna1
           
