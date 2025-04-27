@@ -2,6 +2,8 @@
 
 Binary files for Python 3.
 
+![GitHub all releases](https://img.shields.io/github/downloads/anubhavkrishna1/python3-binary/total)
+
 ## Usage
 
 This repository provides pre-built Python binaries for Linux. Follow the steps below to use them:
