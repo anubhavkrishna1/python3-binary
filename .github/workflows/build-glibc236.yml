@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Install basic tools
       run: |
+        export DEBIAN_FRONTEND=noninteractive
+        export TZ=UTC
         apt-get update
         apt-get install -y ca-certificates curl wget git
         
@@ -31,6 +33,8 @@ jobs:
         
     - name: Install build dependencies
       run: |
+        export DEBIAN_FRONTEND=noninteractive
+        export TZ=UTC
         apt-get update
         apt-get install -y \
           build-essential \
