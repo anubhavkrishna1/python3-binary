@@ -110,6 +110,7 @@ jobs:
     - name: Test Python installation
       run: |
         export LD_LIBRARY_PATH=$PWD/python_install/lib:$LD_LIBRARY_PATH
+        export PATH="$PWD/python_install/bin:$PATH"
         python_install/bin/python3 --version
         python_install/bin/python3 -c "import sys; print(f'Python {sys.version}')"
         python_install/bin/python3 -c "import ssl; print(f'SSL support: {ssl.OPENSSL_VERSION}')"
