@@ -1,0 +1,182 @@
+name: Build Python Binary with glibc 2.36
+
+on:
+  workflow_dispatch:
+    inputs:
+      python_version:
+        description: 'Python version to build (e.g., 3.9.18, 3.10.13, 3.11.7)'
+        required: true
+        default: '3.11.7'
+
+jobs:
+  build-python-glibc236:
+    runs-on: ubuntu-20.04  # Using Ubuntu 20.04 for older glibc
+    container:
+      image: ubuntu:18.04  # Even older Ubuntu for glibc 2.36 compatibility
+    steps:
+    - name: Install basic tools
+      run: |
+        apt-get update
+        apt-get install -y ca-certificates curl wget git
+        
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set architecture and build date
+      run: |
+        echo "RELEASE_TAG=python-${{ github.event.inputs.python_version }}-linux-glibc236" >> $GITHUB_ENV
+        echo "BUILD_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+        echo "ARCHITECTURE=$(uname -m)" >> $GITHUB_ENV
+        echo "GLIBC_VERSION=$(ldd --version | head -n1 | grep -o '[0-9]\+\.[0-9]\+')" >> $GITHUB_ENV
+        
+    - name: Install build dependencies
+      run: |
+        apt-get update
+        apt-get install -y \
+          build-essential \
+          gdb \
+          lcov \
+          pkg-config \
+          libbz2-dev \
+          libffi-dev \
+          libgdbm-dev \
+          libgdbm-compat-dev \
+          liblzma-dev \
+          libncurses5-dev \
+          libreadline6-dev \
+          libsqlite3-dev \
+          libssl-dev \
+          lzma \
+          lzma-dev \
+          tk-dev \
+          uuid-dev \
+          zlib1g-dev \
+          wget \
+          curl \
+          llvm \
+          make \
+          xz-utils
+
+    - name: Download Python source
+      run: |
+        wget https://www.python.org/ftp/python/${{ github.event.inputs.python_version }}/Python-${{ github.event.inputs.python_version }}.tgz
+        tar xzf Python-${{ github.event.inputs.python_version }}.tgz
+        
+    - name: Prepare build directory
+      run: |
+        mkdir -p python_install
+        INSTALL_PATH=$(pwd)/python_install
+        echo "INSTALL_PATH=$INSTALL_PATH" >> $GITHUB_ENV
+
+    - name: Configure and build Python
+      run: |
+        cd Python-${{ github.event.inputs.python_version }}
+        
+        # Set optimization flags for glibc 2.36 compatibility
+        OPT_FLAGS="--enable-optimizations --with-lto"
+        
+        # Additional flags for better compatibility with older systems
+        COMPAT_FLAGS="--enable-shared --with-system-ffi --with-computed-gotos"
+        
+        # Configure Python build
+        INSTALL_PATH=$(pwd)/../python_install
+        ./configure \
+          --prefix=$INSTALL_PATH \
+          $OPT_FLAGS \
+          $COMPAT_FLAGS \
+          --enable-loadable-sqlite-extensions \
+          --with-dbmliborder=bdb:gdbm \
+          --with-ssl-default-suites=openssl
+        
+        # Build and install
+        make -j$(nproc)
+        make install
+
+        # Fix any remaining shebang issues
+        PY_VERSION=$(echo ${{ github.event.inputs.python_version }} | cut -d. -f1,2)
+        find "$INSTALL_PATH/bin" -type f -not -name "python*" -exec sed -i '1s|^#!.*/bin/python[0-9.]*|#!/usr/bin/env python'$PY_VERSION'|' {} \;
+
+    - name: Verify glibc compatibility
+      run: |
+        echo "Checking glibc dependencies:"
+        find python_install -name "*.so*" -exec ldd {} \; | grep libc.so | sort -u
+        echo "Python executable glibc dependencies:"
+        ldd python_install/bin/python* | grep libc.so
+
+    - name: Test Python installation
+      run: |
+        export LD_LIBRARY_PATH=$PWD/python_install/lib:$LD_LIBRARY_PATH
+        python_install/bin/python3 --version
+        python_install/bin/python3 -c "import sys; print(f'Python {sys.version}')"
+        python_install/bin/python3 -c "import ssl; print(f'SSL support: {ssl.OPENSSL_VERSION}')"
+        python_install/bin/pip3 --version
+
+    - name: Remove unnecessary files
+      run: |
+        # Remove tests
+        find python_install -type d -name "test" -o -name "tests" | xargs rm -rf 2>/dev/null || true
+        find python_install -type d -name "__pycache__" | xargs rm -rf 2>/dev/null || true
+
+        # Remove idle and other GUI tools if not needed
+        rm -f python_install/bin/idle* 2>/dev/null || true
+        
+        # Remove static libraries to reduce size
+        find python_install -name "*.a" -delete 2>/dev/null || true
+
+    - name: Create binary archives
+      run: |
+        PACKAGE_NAME="python-${{ github.event.inputs.python_version }}-linux-glibc236-$(uname -m)"
+        
+        # Create tarball
+        tar -czvf $PACKAGE_NAME.tar.gz -C python_install .
+        
+        # Create zip file
+        cd python_install
+        zip -r ../$PACKAGE_NAME.zip .
+        cd ..
+        
+        echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+        
+    - name: Create checksum file
+      run: |
+        sha256sum ${{ env.PACKAGE_NAME }}.tar.gz ${{ env.PACKAGE_NAME }}.zip > SHA256SUMS.txt
+        
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.RELEASE_TAG }}
+        name: Python ${{ github.event.inputs.python_version }} Linux Binary (glibc 2.36)
+        body: |
+          Custom Python ${{ github.event.inputs.python_version }} binary build for Linux with glibc 2.36 compatibility
+          
+          **Build Configuration:**
+          - Python Version: ${{ github.event.inputs.python_version }}
+          - glibc Version: ${{ env.GLIBC_VERSION }}
+          - Optimization Level: 2 (full optimizations with LTO)
+          - With Pip/Setuptools/Wheel: Yes
+          - Architecture: ${{ env.ARCHITECTURE }}
+          - Build Date: ${{ env.BUILD_DATE }}
+          - Built by: anubhavkrishna1
+          - Container: Ubuntu 18.04 for maximum compatibility
+          
+          **Features:**
+          - Compatible with older Linux distributions (glibc 2.36+)
+          - Shared libraries enabled for better compatibility
+          - SSL/TLS support included
+          - SQLite extensions support
+          - Optimized with LTO and PGO
+          
+          **Installation:**
+          1. Download the tar.gz file
+          2. Download and run the install.sh script: `bash install.sh [install_path]`
+          3. Or extract manually: `tar -xzf ${{ env.PACKAGE_NAME }}.tar.gz -C /your/install/path`
+          
+        draft: false
+        prerelease: false
+        files: |
+          ${{ env.PACKAGE_NAME }}.tar.gz
+          ${{ env.PACKAGE_NAME }}.zip
+          SHA256SUMS.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
