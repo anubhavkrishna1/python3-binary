@@ -19,7 +19,7 @@ jobs:
         export DEBIAN_FRONTEND=noninteractive
         export TZ=UTC
         apt-get update
-        apt-get install -y ca-certificates curl wget git
+        apt-get install -y ca-certificates curl wget git zip
         
     - name: Checkout repository
       uses: actions/checkout@v3
