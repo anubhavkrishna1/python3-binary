@@ -10,9 +10,7 @@ on:
 
 jobs:
   build-python-glibc236:
-    runs-on: ubuntu-20.04  # Using Ubuntu 20.04 for older glibc
-    container:
-      image: ubuntu:18.04  # Even older Ubuntu for glibc 2.36 compatibility
+    runs-on: ubuntu-22.04  # Updated to supported Ubuntu version
     steps:
     - name: Install basic tools
       run: |
