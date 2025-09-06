@@ -24,7 +24,7 @@ jobs:
     - name: Cache apt packages
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: build-essential gdb lcov pkg-config libbz2-dev libffi-dev libgdbm-dev libgdbm-compat-dev liblzma-dev libncurses5-dev libreadline6-dev libsqlite3-dev libssl-dev lzma lzma-dev tk-dev uuid-dev zlib1g-dev wget curl llvm make
+        packages: build-essential gdb lcov pkg-config libbz2-dev libffi-dev libgdbm-dev libgdbm-compat-dev liblzma-dev libncurses5-dev libreadline6-dev libsqlite3-dev libssl-dev lzma lzma-dev tk-dev uuid-dev zlib1g-dev wget curl llvm make dpkg-deb fakeroot
         version: 1.0
 
     - name: Download Python source
@@ -78,10 +78,44 @@ jobs:
         cd ..
         
         echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+
+    - name: Create deb package
+      run: |
+        PACKAGE_NAME="python-${{ github.event.inputs.python_version }}-linux-$(uname -m)"
+        PY_VERSION="${{ github.event.inputs.python_version }}"
+        PY_MAJOR_MINOR=$(echo $PY_VERSION | cut -d. -f1,2)
+        
+        # Create deb package structure
+        mkdir -p deb_package/DEBIAN
+        mkdir -p deb_package/opt/python-$PY_VERSION
+        
+        # Copy Python installation to deb package structure
+        cp -r python_install/* deb_package/opt/python-$PY_VERSION/
+        
+        # Create DEBIAN control file
+        INSTALLED_SIZE=$(du -sk deb_package/opt | cut -f1)
+        echo "Package: python${PY_MAJOR_MINOR}-custom" > deb_package/DEBIAN/control
+        echo "Version: $PY_VERSION" >> deb_package/DEBIAN/control
+        echo "Section: interpreters" >> deb_package/DEBIAN/control
+        echo "Priority: optional" >> deb_package/DEBIAN/control
+        echo "Architecture: amd64" >> deb_package/DEBIAN/control
+        echo "Installed-Size: $INSTALLED_SIZE" >> deb_package/DEBIAN/control
+        echo "Depends: libc6 (>= 2.17), libssl3 | libssl1.1, zlib1g, libbz2-1.0, libffi8 | libffi7 | libffi6, libgdbm6 | libgdbm5, liblzma5, libncurses6 | libncurses5, libreadline8 | libreadline7 | libreadline6, libsqlite3-0, uuid-runtime" >> deb_package/DEBIAN/control
+        echo "Maintainer: anubhavkrishna1 <noreply@github.com>" >> deb_package/DEBIAN/control
+        echo "Description: Custom Python $PY_VERSION interpreter" >> deb_package/DEBIAN/control
+        echo " This package provides a custom-built Python $PY_VERSION interpreter" >> deb_package/DEBIAN/control
+        echo " with optimizations enabled. Built from source with LTO and PGO" >> deb_package/DEBIAN/control
+        echo " optimizations for better performance." >> deb_package/DEBIAN/control
+        echo " ." >> deb_package/DEBIAN/control
+        echo " The Python installation is located in /opt/python-$PY_VERSION/" >> deb_package/DEBIAN/control
+        echo " and includes pip, setuptools, and wheel." >> deb_package/DEBIAN/control
+        
+        # Build deb package
+        fakeroot dpkg-deb --build deb_package $PACKAGE_NAME.deb
         
     - name: Create checksum file
       run: |
-        sha256sum ${{ env.PACKAGE_NAME }}.tar.gz ${{ env.PACKAGE_NAME }}.zip > SHA256SUMS.txt
+        sha256sum ${{ env.PACKAGE_NAME }}.tar.gz ${{ env.PACKAGE_NAME }}.zip ${{ env.PACKAGE_NAME }}.deb > SHA256SUMS.txt
         
     - name: Create Release
       id: create_release
@@ -100,11 +134,21 @@ jobs:
           - Build Date: ${{ env.BUILD_DATE }}
           - Built by: anubhavkrishna1
           
+          **Available Formats:**
+          - `.tar.gz` - Extract to any directory
+          - `.zip` - Extract to any directory  
+          - `.deb` - Debian/Ubuntu package (installs to /opt/python-${{ github.event.inputs.python_version }}/)
+          
+          **Installation:**
+          - **Debian/Ubuntu**: `sudo dpkg -i ${{ env.PACKAGE_NAME }}.deb`
+          - **Manual**: Extract tar.gz or zip to desired location
+          
         draft: false
         prerelease: false
         files: |
           ${{ env.PACKAGE_NAME }}.tar.gz
           ${{ env.PACKAGE_NAME }}.zip
+          ${{ env.PACKAGE_NAME }}.deb
           SHA256SUMS.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
