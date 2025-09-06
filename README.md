@@ -11,9 +11,23 @@ This repository provides pre-built Python binaries for Linux. Follow the steps b
 1. **📥 Download the Binary**
    
 - Navigate to the [Releases](https://github.com/anubhavkrishna1/python3-binary/releases) section of this repository.
-- Download the appropriate binary archive (`.tar.gz` or `.zip`) for your desired Python version and architecture.
+- Download the appropriate binary archive for your desired Python version and architecture:
+  - `.tar.gz` or `.zip` files for manual extraction
+  - `.deb` files for Debian/Ubuntu systems
 
-2. **📦 Extract the Binary**
+2. **📦 Install the Binary**
+
+**For Debian/Ubuntu systems (recommended):**
+```bash
+# Download the .deb file and install
+sudo dpkg -i python-<version>-linux-<arch>.deb
+
+# Python will be available as python<version> and python<major.minor>
+python3.11 --version
+pip3.11 --version
+```
+
+**For manual installation:**
 - For `.tar.gz` files:
   
      ```bash
@@ -31,7 +45,7 @@ This repository provides pre-built Python binaries for Linux. Follow the steps b
      unzip python-<version>-linux-<arch>.zip -d /desired/path
      ```
 
-3. **🔧 Set Up Environment**
+3. **🔧 Set Up Environment (Manual Installation Only)**
    
 - Add the extracted binary directory to your `PATH`:
   
@@ -45,7 +59,23 @@ This repository provides pre-built Python binaries for Linux. Follow the steps b
      ```
 
 4. **💻 Start Using Python**
-- You can now use the custom Python binary for your projects.
+- **Debian/Ubuntu users**: Python will be available system-wide as `python<version>` (e.g., `python3.11`)
+- **Manual installation users**: You can now use the custom Python binary for your projects.
+
+## 🗑️ Uninstalling (Debian/Ubuntu)
+
+To remove a Python version installed via deb package:
+
+```bash
+# List installed custom Python packages
+dpkg -l | grep python.*custom
+
+# Remove the package (replace with your specific version)
+sudo dpkg -r python3.11-custom
+
+# For glibc236 versions
+sudo dpkg -r python3.11-custom-glibc236
+```
 
 ## 🛠️ Building Your Own Custom Python Version
 
