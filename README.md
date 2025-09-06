@@ -22,9 +22,14 @@ This repository provides pre-built Python binaries for Linux. Follow the steps b
 # Download the .deb file and install
 sudo dpkg -i python-<version>-linux-<arch>.deb
 
-# Python will be available as python<version> and python<major.minor>
-python3.11 --version
-pip3.11 --version
+# Python will be installed to /opt/python-<version>/bin/
+# You can use it directly:
+/opt/python-<version>/bin/python3 --version
+/opt/python-<version>/bin/pip3 --version
+
+# Or add to your PATH for convenience:
+export PATH="/opt/python-<version>/bin:$PATH"
+python3 --version
 ```
 
 **For manual installation:**
@@ -59,7 +64,7 @@ pip3.11 --version
      ```
 
 4. **💻 Start Using Python**
-- **Debian/Ubuntu users**: Python will be available system-wide as `python<version>` (e.g., `python3.11`)
+- **Debian/Ubuntu users**: Python is installed to `/opt/python-<version>/` and can be used directly or added to PATH
 - **Manual installation users**: You can now use the custom Python binary for your projects.
 
 ## 🗑️ Uninstalling (Debian/Ubuntu)
