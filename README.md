@@ -4,6 +4,17 @@ Binary files for Python 3.
 
 ![GitHub all releases](https://img.shields.io/github/downloads/anubhavkrishna1/python3-binary/total)
 
+## 📦 Available Python Binaries
+
+| Python Version | Platform | glibc | Release Date | Download |
+|----------------|----------|-------|--------------|----------|
+| 3.12.10 | Linux x86_64 | - | 2025-04-16 | [tar.gz](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.12.10-linux/python-3.12.10-linux-x86_64.tar.gz) \| [zip](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.12.10-linux/python-3.12.10-linux-x86_64.zip) |
+| 3.11.12 | Linux x86_64 | - | 2025-04-21 | [tar.gz](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.11.12-linux/python-3.11.12-linux-x86_64.tar.gz) \| [zip](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.11.12-linux/python-3.11.12-linux-x86_64.zip) |
+| 3.9.22 | Linux x86_64 | 2.36+ | 2025-07-01 | [tar.gz](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.9.22-linux-glibc236/python-3.9.22-linux-glibc236-x86_64.tar.gz) \| [zip](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.9.22-linux-glibc236/python-3.9.22-linux-glibc236-x86_64.zip) |
+| 3.8.20 | Linux x86_64 | - | 2025-04-27 | [tar.gz](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.8.20-linux/python-3.8.20-linux-x86_64.tar.gz) \| [zip](https://github.com/anubhavkrishna1/python3-binary/releases/download/python-3.8.20-linux/python-3.8.20-linux-x86_64.zip) |
+
+> 💡 For detailed release notes and checksums, visit the [Releases](https://github.com/anubhavkrishna1/python3-binary/releases) page.
+
 ## 🚀 Usage
 
 This repository provides pre-built Python binaries for Linux. Follow the steps below to use them:
